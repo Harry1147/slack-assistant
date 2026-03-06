@@ -1,15 +1,19 @@
 import { chromium } from 'playwright';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export class SlackAssistant {
   constructor(options = {}) {
     this.browser = null;
     this.page = null;
     this.debugPath = options.debugPath || './debug';
-    this.headless = options.headless ?? false;
     this.apiKey = options.apiKey || process.env.DASHSCOPE_API_KEY;
     this.timeout = options.timeout || 60000;
+    this.chromePath = options.chromePath || 'google-chrome';
     
     if (!this.apiKey) {
       throw new Error('DASHSCOPE_API_KEY environment variable required');
@@ -18,33 +22,67 @@ export class SlackAssistant {
 
   async initialize() {
     console.log('🤖 Slack Assistant initializing...\n');
+    console.log('📋 Mode: Connect to existing Chrome (you keep Slack logged in)\n');
     
     await mkdir(this.debugPath, { recursive: true });
     
-    this.browser = await chromium.launch({
-      headless: this.headless,
-      args: ['--disable-blink-features=AutomationControlled']
-    });
+    // Connect to running Chrome via DevTools Protocol
+    console.log('🔌 Connecting to Chrome...');
+    console.log('   Make sure Chrome is running with Slack open!\n');
     
-    const context = await this.browser.newContext({
-      viewport: { width: 1280, height: 720 },
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-    });
+    try {
+      // Connect to Chrome's DevTools Protocol
+      this.browser = await chromium.connectOverCDP('http://localhost:9222');
+      
+      // Get the first context and page (your existing Slack tab)
+      const context = this.browser.contexts()[0];
+      const pages = context.pages();
+      
+      if (pages.length === 0) {
+        throw new Error('No tabs found in Chrome. Please open Slack first!');
+      }
+      
+      // Find Slack tab or use first tab
+      this.page = pages.find(p => p.url().includes('slack.com')) || pages[0];
+      
+      console.log(`✅ Connected to Chrome!`);
+      console.log(`   Current tab: ${this.page.url().substring(0, 60)}...\n`);
+      
+    } catch (error) {
+      console.log('❌ Could not connect to Chrome!\n');
+      console.log('📝 To enable Chrome remote debugging:');
+      console.log('');
+      console.log('   **Option 1: Quick Start (macOS)**');
+      console.log('   1. Close ALL Chrome windows completely (Cmd+Q)');
+      console.log('   2. Run this command in terminal:');
+      console.log('      open -a "Google Chrome" --args --remote-debugging-port=9222');
+      console.log('   3. Open Slack in Chrome: https://app.slack.com');
+      console.log('   4. Run this command again\n');
+      console.log('   **Option 2: Create Chrome Shortcut**');
+      console.log('   Create a shortcut with target:');
+      console.log('   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222\n');
+      throw error;
+    }
     
-    this.page = await context.newPage();
-    console.log('✅ Browser launched\n');
     return this;
   }
 
   async navigateToSlack() {
-    console.log('📍 Navigating to Slack...');
-    await this.page.goto('https://app.slack.com', { 
-      waitUntil: 'networkidle',
-      timeout: this.timeout 
-    });
-    await this.page.waitForTimeout(3000);
+    console.log('📍 Checking Slack tab...');
+    
+    // If not on Slack, navigate there
+    const currentUrl = this.page.url();
+    if (!currentUrl.includes('slack.com')) {
+      console.log('   Not on Slack, navigating...');
+      await this.page.goto('https://app.slack.com', { 
+        waitUntil: 'networkidle',
+        timeout: this.timeout 
+      });
+    }
+    
+    await this.page.waitForTimeout(2000);
     await this.captureScreenshot('slack_loaded');
-    console.log('✅ Slack loaded\n');
+    console.log('✅ Slack ready\n');
     return this;
   }
 
@@ -255,8 +293,9 @@ Return JSON:
 
   async close() {
     if (this.browser) {
-      await this.browser.close();
-      console.log('👋 Browser closed\n');
+      // Don't close user's Chrome, just disconnect
+      await this.browser.disconnect();
+      console.log('👋 Disconnected from Chrome (your browser stays open)\n');
     }
   }
 }

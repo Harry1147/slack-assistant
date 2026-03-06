@@ -1,8 +1,11 @@
 # Slack Assistant
 
-**Vision-based Slack assistant** that navigates the UI and finds unread messages using Qwen-VL.
+**Vision-based Slack assistant** that connects to your **existing Chrome browser** (where you're already logged into Slack) and finds unread messages using Qwen-VL.
 
-Built with Playwright + Qwen-VL for silent, overlay-free operation!
+✅ **No login needed** - Uses your existing Chrome tab  
+✅ **No automation detection** - It's your real browser  
+✅ **Silent screenshots** - No macOS overlay  
+✅ **Vision-powered** - Qwen-VL analyzes Slack UI
 
 ---
 
@@ -19,13 +22,42 @@ Built with Playwright + Qwen-VL for silent, overlay-free operation!
 
 ## Quick Start
 
+### Step 1: Install & Configure
+
 ```bash
 # Install dependencies
 npm install
 
 # Set API key
 export DASHSCOPE_API_KEY=your_key_here
+```
 
+### Step 2: Start Chrome with Remote Debugging
+
+**macOS:**
+```bash
+# 1. Close ALL Chrome windows completely (Cmd+Q)
+# 2. Run this command:
+open -a "Google Chrome" --args --remote-debugging-port=9222
+
+# 3. Open Slack in Chrome
+# Go to: https://app.slack.com
+# Make sure you're logged in!
+```
+
+**Linux:**
+```bash
+google-chrome --remote-debugging-port=9222
+```
+
+**Windows:**
+```cmd
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+```
+
+### Step 3: Run the Assistant
+
+```bash
 # Get summary
 npm run summary
 
