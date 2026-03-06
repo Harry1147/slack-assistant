@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readFile as readFileSync } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -95,6 +95,43 @@ export class SlackAssistant {
     console.log(`   📍 Current URL: ${url.substring(0, 80)}...`);
     
     return path;
+  }
+
+  async clickAt(x, y) {
+    // Use cliclick for reliable mouse clicks
+    try {
+      await execAsync(`cliclick c:${x},${y}`);
+      await this.page.waitForTimeout(500);
+      return true;
+    } catch (e) {
+      console.warn('   ⚠️  cliclick not available, falling back to Playwright click');
+      // Fallback to Playwright
+      await this.page.mouse.click(x, y);
+      await this.page.waitForTimeout(500);
+      return false;
+    }
+  }
+
+  async findAndClick(selector, description) {
+    // Find element and click on it
+    try {
+      const element = await this.page.$(selector);
+      if (element) {
+        const box = await element.boundingBox();
+        if (box) {
+          const x = Math.floor(box.x + box.width / 2);
+          const y = Math.floor(box.y + box.height / 2);
+          console.log(`   🖱️  Clicking ${description} at (${x}, ${y})...`);
+          await this.clickAt(x, y);
+          return true;
+        }
+      }
+      console.log(`   ⚠️  ${description} not found`);
+      return false;
+    } catch (e) {
+      console.warn(`   ❌ Error clicking ${description}:`, e.message);
+      return false;
+    }
   }
 
   async analyzeWithVision(screenshotPath, task) {
@@ -211,38 +248,30 @@ Return JSON:
   async findUnreadMessages() {
     console.log('🔍 Finding unread messages...\n');
     
-    // Navigate to a channel view to see sidebar clearly
-    // This is more reliable than keyboard shortcuts
-    console.log('   📍 Ensuring we can see the sidebar...');
+    // Navigate to main Slack view using mouse clicks
+    console.log('   📍 Navigating to main view...');
     
-    // Get current URL
     const currentUrl = this.page.url();
     
-    // If we're in a thread or DM, go back to main view
-    if (currentUrl.includes('/thread/') || currentUrl.includes('/dm/')) {
-      // Extract workspace from current URL
-      const match = currentUrl.match(/(https:\/\/[^\/]+)\/client/);
-      if (match) {
-        await this.page.goto(`${match[1]}/client`, { waitUntil: 'networkidle' });
-        await this.page.waitForTimeout(1000);
+    // If we're in a thread or specific channel, go back to main view
+    if (currentUrl.includes('/thread/') || currentUrl.includes('/messages/')) {
+      // Click on workspace home (usually top-left)
+      const clicked = await this.findAndClick('[data-qa="workspace_name"]', 'Workspace home');
+      if (!clicked) {
+        // Fallback: navigate via URL
+        const match = currentUrl.match(/(https:\/\/[^\/]+)\/client/);
+        if (match) {
+          console.log('   📍 Navigating via URL...');
+          await this.page.goto(`${match[1]}/client`, { waitUntil: 'networkidle' });
+          await this.page.waitForTimeout(1000);
+        }
       }
-    }
-    
-    // Try keyboard shortcut first (works if Chrome is focused)
-    try {
-      await this.page.keyboard.press('Meta+Shift+D');
-      await this.page.waitForTimeout(500);
-      console.log('   ⌨️  Keyboard shortcut sent');
-    } catch (e) {
-      console.log('   ⚠️  Keyboard shortcut may not have worked (Chrome not focused?)');
     }
     
     await this.page.waitForTimeout(1000);
     
     const screenshot = await this.captureScreenshot('sidebar');
     console.log(`📸 Sidebar captured: ${screenshot}\n`);
-    
-    console.log('   💡 Tip: Make sure Chrome window is visible and focused for keyboard shortcuts to work!\n');
     
     const result = await this.analyzeWithVision(screenshot, 'unread');
     
@@ -274,25 +303,35 @@ Return JSON:
   async checkMentions() {
     console.log('🔔 Checking @mentions...\n');
     
-    // Navigate directly to Activity page (more reliable than keyboard shortcut)
+    // Navigate to Activity page using mouse clicks
     console.log('   📍 Navigating to Activity page...');
     
-    const currentUrl = this.page.url();
-    const match = currentUrl.match(/(https:\/\/[^\/]+)\/client/);
+    // Look for Activity button in sidebar (usually has a bell or @ icon)
+    const activitySelectors = [
+      '[href*="/activity"]',
+      '[data-qa="activity_button"]',
+      'a[href*="activity"]',
+      '[aria-label*="Activity"]'
+    ];
     
-    if (match) {
-      // Go directly to Activity page
-      const activityUrl = `${match[1]}/client/activity`;
-      console.log(`   → ${activityUrl}`);
-      await this.page.goto(activityUrl, { waitUntil: 'networkidle' });
-      await this.page.waitForTimeout(2000);
-      console.log('   ✅ Activity page loaded');
-    } else {
-      // Fallback to keyboard shortcut
-      console.log('   ⌨️  Trying keyboard shortcut...');
-      await this.page.keyboard.press('Meta+Shift+A');
-      await this.page.waitForTimeout(2000);
+    let clicked = false;
+    for (const selector of activitySelectors) {
+      clicked = await this.findAndClick(selector, 'Activity button');
+      if (clicked) break;
     }
+    
+    if (!clicked) {
+      // Fallback: navigate via URL
+      const currentUrl = this.page.url();
+      const match = currentUrl.match(/(https:\/\/[^\/]+)\/client/);
+      if (match) {
+        console.log('   📍 Fallback: Navigating via URL...');
+        await this.page.goto(`${match[1]}/client/activity`, { waitUntil: 'networkidle' });
+        await this.page.waitForTimeout(2000);
+      }
+    }
+    
+    await this.page.waitForTimeout(2000);
     
     const screenshot = await this.captureScreenshot('activity');
     console.log(`📸 Activity captured: ${screenshot}\n`);
