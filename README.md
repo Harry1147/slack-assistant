@@ -308,12 +308,14 @@ Slack might detect automation. The code already includes anti-detection flags, b
 
 ## Slack Keyboard Shortcuts Used
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+Shift+D` | Focus channel sidebar |
-| `Cmd+Shift+A` | Open Activity (mentions) |
-| `Cmd+K` | Jump to channel |
-| `Cmd+L` | Next unread channel |
+| Shortcut | Playwright Syntax | Action |
+|----------|------------------|--------|
+| `Cmd+Shift+D` | `Meta+Shift+D` | Focus channel sidebar |
+| `Cmd+Shift+A` | `Meta+Shift+A` | Open Activity (mentions) |
+| `Cmd+K` | `Meta+K` | Jump to channel |
+| `Cmd+L` | `Meta+L` | Next unread channel |
+
+**Note:** Playwright uses `Meta` for Cmd key on macOS.
 
 ---
 

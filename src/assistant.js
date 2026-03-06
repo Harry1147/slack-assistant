@@ -206,8 +206,9 @@ Return JSON:
   async findUnreadMessages() {
     console.log('🔍 Finding unread messages...\n');
     
-    // Focus on sidebar
-    await this.page.keyboard.press('Cmd+Shift+D');
+    // Focus on sidebar using Playwright's Meta for Cmd on macOS
+    console.log('   ⌨️  Focusing sidebar (Cmd+Shift+D)...');
+    await this.page.keyboard.press('Meta+Shift+D');
     await this.page.waitForTimeout(1000);
     
     const screenshot = await this.captureScreenshot('sidebar');
@@ -244,7 +245,8 @@ Return JSON:
     console.log('🔔 Checking @mentions...\n');
     
     // Open Activity tab
-    await this.page.keyboard.press('Cmd+Shift+A');
+    console.log('   ⌨️  Opening Activity (Cmd+Shift+A)...');
+    await this.page.keyboard.press('Meta+Shift+A');
     await this.page.waitForTimeout(2000);
     
     const screenshot = await this.captureScreenshot('activity');
