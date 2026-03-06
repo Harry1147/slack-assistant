@@ -1,19 +1,20 @@
 {
   "name": "slack-assistant",
   "version": "1.0.0",
-  "description": "Vision-based Slack assistant for finding and managing unread messages",
+  "description": "Vision-based Slack assistant using mouse clicks for navigation",
   "type": "module",
   "main": "src/assistant.js",
   "scripts": {
     "unread": "node src/assistant.js unread",
     "mentions": "node src/assistant.js mentions",
     "summary": "node src/assistant.js summary",
+    "test-click": "node src/click-test.js",
     "test": "node src/test.js"
   },
   "dependencies": {
     "playwright": "^1.42.0"
   },
-  "keywords": ["slack", "assistant", "vision", "automation"],
+  "keywords": ["slack", "assistant", "vision", "automation", "cliclick"],
   "author": "Harry Wang",
   "license": "MIT"
 }

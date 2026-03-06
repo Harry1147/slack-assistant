@@ -26,6 +26,22 @@ export class SlackAssistant {
     
     await mkdir(this.debugPath, { recursive: true });
     
+    // CRITICAL: Check if cliclick is installed
+    console.log('🔧 Checking for cliclick (required for mouse clicks)...');
+    try {
+      await execAsync('which cliclick');
+      console.log('   ✅ cliclick found - mouse clicks will be VISIBLE!\n');
+    } catch (e) {
+      console.log('   ❌ cliclick NOT FOUND!\n');
+      console.log('   ┌────────────────────────────────────────────┐');
+      console.log('   │  ERROR: cliclick is REQUIRED for this app │');
+      console.log('   └────────────────────────────────────────────┘\n');
+      console.log('   📝 Install with:');
+      console.log('      brew install cliclick\n');
+      console.log('   💡 Then run again.\n');
+      throw new Error('cliclick is required. Install with: brew install cliclick');
+    }
+    
     // Connect to running Chrome via DevTools Protocol
     console.log('🔌 Connecting to Chrome...');
     console.log('   Make sure Chrome is running with Slack open!\n');
@@ -97,39 +113,54 @@ export class SlackAssistant {
     return path;
   }
 
-  async clickAt(x, y) {
-    // Use cliclick for reliable mouse clicks
+  async clickAt(x, y, label = '') {
+    // ALWAYS use cliclick for visible mouse clicks
+    const labelStr = label ? ` (${label})` : '';
+    console.log(`   🖱️  Clicking at (${x}, ${y})${labelStr}...`);
+    
     try {
       await execAsync(`cliclick c:${x},${y}`);
-      await this.page.waitForTimeout(500);
+      console.log(`   ✅ Click executed\n`);
+      await this.page.waitForTimeout(800);
       return true;
     } catch (e) {
-      console.warn('   ⚠️  cliclick not available, falling back to Playwright click');
-      // Fallback to Playwright
-      await this.page.mouse.click(x, y);
-      await this.page.waitForTimeout(500);
-      return false;
+      console.error(`   ❌ cliclick FAILED: ${e.message}`);
+      console.error(`\n   📝 You MUST install cliclick for mouse clicks to work!`);
+      console.error(`   📝 Run: brew install cliclick\n`);
+      throw new Error('cliclick not available - please install it');
     }
   }
 
   async findAndClick(selector, description) {
-    // Find element and click on it
+    // Find element on page and click on it using cliclick
     try {
+      console.log(`   🔍 Looking for: ${description}...`);
+      
       const element = await this.page.$(selector);
-      if (element) {
-        const box = await element.boundingBox();
-        if (box) {
-          const x = Math.floor(box.x + box.width / 2);
-          const y = Math.floor(box.y + box.height / 2);
-          console.log(`   🖱️  Clicking ${description} at (${x}, ${y})...`);
-          await this.clickAt(x, y);
-          return true;
-        }
+      if (!element) {
+        console.log(`   ⚠️  Element not found in DOM\n`);
+        return false;
       }
-      console.log(`   ⚠️  ${description} not found`);
-      return false;
+      
+      const box = await element.boundingBox();
+      if (!box) {
+        console.log(`   ⚠️  Element not visible (no bounding box)\n`);
+        return false;
+      }
+      
+      // Calculate center of element
+      const x = Math.floor(box.x + box.width / 2);
+      const y = Math.floor(box.y + box.height / 2);
+      
+      console.log(`   📍 Found: ${description}`);
+      console.log(`   📏 Position: (${x}, ${y}), Size: ${Math.floor(box.width)}x${Math.floor(box.height)}\n`);
+      
+      // Click using cliclick (this will be visible!)
+      await this.clickAt(x, y, description);
+      
+      return true;
     } catch (e) {
-      console.warn(`   ❌ Error clicking ${description}:`, e.message);
+      console.error(`   ❌ Error finding ${description}:`, e.message);
       return false;
     }
   }
