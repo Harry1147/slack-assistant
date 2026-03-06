@@ -172,16 +172,32 @@ Return JSON:
     }
     
     const data = await response.json();
-    const content = data.output?.choices?.[0]?.message?.content || '';
+    
+    // Qwen-VL returns content as array: [{ text: "..." }] or plain string
+    let content = data.output?.choices?.[0]?.message?.content || '';
+    
+    // Handle array format
+    if (Array.isArray(content)) {
+      content = content[0]?.text || '';
+    }
     
     // Parse JSON from response
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      // Strip markdown code fences if present
+      let cleanContent = content;
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        cleanContent = codeBlockMatch[1];
+      }
+      
+      // Extract JSON
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
     } catch (e) {
       console.warn('Failed to parse vision response:', e.message);
+      console.warn('Raw content:', content?.substring?.(0, 300) || content);
     }
     
     return { raw: content };
