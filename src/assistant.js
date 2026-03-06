@@ -293,8 +293,9 @@ Return JSON:
 
   async close() {
     if (this.browser) {
-      // Don't close user's Chrome, just disconnect
-      await this.browser.disconnect();
+      // Don't close user's Chrome, just release the connection
+      // Note: connectOverCDP doesn't have disconnect(), so we just nullify
+      this.browser = null;
       console.log('👋 Disconnected from Chrome (your browser stays open)\n');
     }
   }
