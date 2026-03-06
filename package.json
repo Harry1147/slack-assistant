@@ -1,0 +1,19 @@
+{
+  "name": "slack-assistant",
+  "version": "1.0.0",
+  "description": "Vision-based Slack assistant for finding and managing unread messages",
+  "type": "module",
+  "main": "src/assistant.js",
+  "scripts": {
+    "unread": "node src/assistant.js unread",
+    "mentions": "node src/assistant.js mentions",
+    "summary": "node src/assistant.js summary",
+    "test": "node src/test.js"
+  },
+  "dependencies": {
+    "playwright": "^1.42.0"
+  },
+  "keywords": ["slack", "assistant", "vision", "automation"],
+  "author": "Harry Wang",
+  "license": "MIT"
+}
