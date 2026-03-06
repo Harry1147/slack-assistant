@@ -89,6 +89,11 @@ export class SlackAssistant {
   async captureScreenshot(name) {
     const path = join(this.debugPath, `${name}_${Date.now()}.png`);
     await this.page.screenshot({ path, fullPage: false });
+    
+    // Also log current URL for debugging
+    const url = this.page.url();
+    console.log(`   📍 Current URL: ${url.substring(0, 80)}...`);
+    
     return path;
   }
 
@@ -206,13 +211,38 @@ Return JSON:
   async findUnreadMessages() {
     console.log('🔍 Finding unread messages...\n');
     
-    // Focus on sidebar using Playwright's Meta for Cmd on macOS
-    console.log('   ⌨️  Focusing sidebar (Cmd+Shift+D)...');
-    await this.page.keyboard.press('Meta+Shift+D');
+    // Navigate to a channel view to see sidebar clearly
+    // This is more reliable than keyboard shortcuts
+    console.log('   📍 Ensuring we can see the sidebar...');
+    
+    // Get current URL
+    const currentUrl = this.page.url();
+    
+    // If we're in a thread or DM, go back to main view
+    if (currentUrl.includes('/thread/') || currentUrl.includes('/dm/')) {
+      // Extract workspace from current URL
+      const match = currentUrl.match(/(https:\/\/[^\/]+)\/client/);
+      if (match) {
+        await this.page.goto(`${match[1]}/client`, { waitUntil: 'networkidle' });
+        await this.page.waitForTimeout(1000);
+      }
+    }
+    
+    // Try keyboard shortcut first (works if Chrome is focused)
+    try {
+      await this.page.keyboard.press('Meta+Shift+D');
+      await this.page.waitForTimeout(500);
+      console.log('   ⌨️  Keyboard shortcut sent');
+    } catch (e) {
+      console.log('   ⚠️  Keyboard shortcut may not have worked (Chrome not focused?)');
+    }
+    
     await this.page.waitForTimeout(1000);
     
     const screenshot = await this.captureScreenshot('sidebar');
     console.log(`📸 Sidebar captured: ${screenshot}\n`);
+    
+    console.log('   💡 Tip: Make sure Chrome window is visible and focused for keyboard shortcuts to work!\n');
     
     const result = await this.analyzeWithVision(screenshot, 'unread');
     
@@ -244,10 +274,25 @@ Return JSON:
   async checkMentions() {
     console.log('🔔 Checking @mentions...\n');
     
-    // Open Activity tab
-    console.log('   ⌨️  Opening Activity (Cmd+Shift+A)...');
-    await this.page.keyboard.press('Meta+Shift+A');
-    await this.page.waitForTimeout(2000);
+    // Navigate directly to Activity page (more reliable than keyboard shortcut)
+    console.log('   📍 Navigating to Activity page...');
+    
+    const currentUrl = this.page.url();
+    const match = currentUrl.match(/(https:\/\/[^\/]+)\/client/);
+    
+    if (match) {
+      // Go directly to Activity page
+      const activityUrl = `${match[1]}/client/activity`;
+      console.log(`   → ${activityUrl}`);
+      await this.page.goto(activityUrl, { waitUntil: 'networkidle' });
+      await this.page.waitForTimeout(2000);
+      console.log('   ✅ Activity page loaded');
+    } else {
+      // Fallback to keyboard shortcut
+      console.log('   ⌨️  Trying keyboard shortcut...');
+      await this.page.keyboard.press('Meta+Shift+A');
+      await this.page.waitForTimeout(2000);
+    }
     
     const screenshot = await this.captureScreenshot('activity');
     console.log(`📸 Activity captured: ${screenshot}\n`);
